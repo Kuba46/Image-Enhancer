@@ -1,0 +1,10 @@
+.DS_Store
+Thumbs.db
+
+# Игнорируем все файлы в папке .vscode, кроме settings.json
+.vscode/
+!.vscode/settings.json
+
+.venv/
+__pycache__/
+data/

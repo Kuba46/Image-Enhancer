@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Image Enhancer</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;600;700&family=Onest:wght@300;400;500&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="./style.css">
+    </head>
+    <body>
+        <header>
+            <div class="badge">Image Enhancer</div>
+        </header>
+        <main>
+            <div class="hero">
+                <h1>Улучшение изображений<br>с помощью <em>ИИ</em></h1>
+                <p>ML-модель анализирует изображение и подбирает оптимальную коррекцию яркости, контраста и цветности</p>
+            </div>
+            <div class="demo-notice" id="demoNotice">
+                <strong>Demo mode:</strong> модель не загружена — используется эвристический алгоритм.
+                Для полноценной работы положите файлы <code>model/model.json</code>, <code>model/weights.bin</code>
+                и <code>model/scaler.json</code> рядом с <code>index.html</code>.
+            </div>
+            
+            <div class="error-msg" id="errorMsg"></div>
+
+            <div class="drop-zone" id="dropZone">
+                <div class="drop-icon">🖼</div>
+                <div class="drop-label">Перетащите изображение сюда</div>
+                <div class="drop-sub">или <strong>нажмите для выбора файла</strong></div>
+                <div class="drop-sub" style="margin-top:8px">JPG, PNG, HEIC, BMP · до 15 Мпк</div>
+                <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.heic,.heif,.bmp,.webp">
+            </div>
+
+            <div id="progress-section">
+                <div class="progress-label">Обработка: <strong id="progressStatus">анализ изображения...</strong></div>
+                <div class="progress-bar-outer">
+                    <div class="progress-bar-inner" id="progressBar"></div>
+                </div>
+                <div class="progress-pct" id="progressPct">0%</div>
+                <button class="btn-cancel" id="btnCancel">Отменить</button>
+            </div>
+
+            <div id="result-section">
+                <div class="params-bar" id="paramsBar"></div>
+                
+                <div class="compare-grid">
+                    <div class="img-card">
+                        <div class="img-card-header">
+                            <span class="dot"></span> Оригинал
+                        </div>
+                        <img id="imgOriginal" alt="Оригинал">
+                    </div>
+                    <div class="img-card">
+                        <div class="img-card-header enhanced">
+                            <span class="dot"></span> Улучшенное
+                        </div>
+                        <img id="imgEnhanced" alt="Улучшенное">
+                    </div>
+                </div>
+                <div class="actions">
+                    <a class="btn btn-primary" id="btnDownload" download="enhanced.jpg">Скачать результат</a>
+                    <button class="btn btn-secondary" id="btnNew">Новое изображение</button>
+                </div>
+            </div>
+        </main>
+        <script type="module" src="./app.js"></script>
+    </body>
+</html>
