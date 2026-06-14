@@ -48,6 +48,7 @@ async function handleFile(file) {
     try {
         const taskId = await enhancer.enqueue(file);
         currentTask  = taskId;
+        const originalName = file.name;
 
         enhancer.addEventListener('taskchange', function handler(e) {
             if (e.detail.taskId !== taskId) return;
@@ -55,7 +56,7 @@ async function handleFile(file) {
 
             if (e.detail.status === TaskStatus.DONE) {
                 enhancer.removeEventListener('taskchange', handler);
-                enhancer.getResult(taskId).then(blob => showResult(blob, e.detail.params));
+                enhancer.getResult(taskId).then(blob => showResult(blob, e.detail.params, originalName));
             }
             if (e.detail.status === TaskStatus.ERROR) {
                 enhancer.removeEventListener('taskchange', handler);

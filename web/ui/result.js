@@ -17,7 +17,7 @@ export function showResult(blob, params) {
     imgResult.src = url;
     imgResult.onload = () => {
         btnDownload.href     = url;
-        btnDownload.download = 'enhanced.jpg';
+        btnDownload.download = buildDownloadName(imgOriginal);
     };
     renderParams(params);
     hideProgress();
@@ -32,6 +32,15 @@ export function showError(msg) {
 
 export function hideError() {
     document.getElementById('errorMsg').style.display = 'none';
+}
+
+function buildDownloadName(inputImageName) {
+    if (!inputImageName) return 'enhanced.jpg';
+    const dot = inputImageName.lastIndexOf('.');
+    if (dot === -1) return inputImageName + '_enhanced';
+    const name = inputImageName.slice(0, dot);
+    const ext  = inputImageName.slice(dot);
+    return `${name}_enhanced${ext}`;
 }
 
 function renderParams(params) {
