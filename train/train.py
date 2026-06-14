@@ -31,6 +31,11 @@ EXPERT_DIRS  = [Path("data/c")]
 MODEL_DIR    = Path("model")
 MODEL_DIR.mkdir(exist_ok=True)
 
+LOL_PAIRS = [
+    (Path("data/LOL-v2/Real_captured/Train/Low"),    Path("data/LOL-v2/Real_captured/Train/Normal")),
+    (Path("data/LOL-v2/Synthetic/Train/Low"),        Path("data/LOL-v2/Synthetic/Train/Normal")),
+]
+
 IMG_PREVIEW_SIZE = (256, 256)
 N_HISTOGRAM_BINS = 16
 RANDOM_SEED      = 42
@@ -122,6 +127,61 @@ def _img_stats(path: Path):
     return lum.mean(), lum.std(), sat.mean()
 
 
+def load_lol_pairs() -> tuple[list, list]:
+    """
+    Загружает пары из LOL-v2 датасета. Возвращает (X, y) — признаки и метки.
+    """
+    X, y = [], []
+
+    available = [(low, norm) for low, norm in LOL_PAIRS if low.exists() and norm.exists()]
+    if not available:
+        return X, y
+
+    for low_dir, norm_dir in available:
+        low_files  = {p.stem: p for ext in ("*.png", "*.jpg")
+                      for p in sorted(low_dir.glob(ext))}
+        norm_files = {p.stem: p for ext in ("*.png", "*.jpg")
+                      for p in sorted(norm_dir.glob(ext))}
+
+        # Имена файлов в LOL-v2 могут не совпадать напрямую —
+        # сортируем и матчим по порядку, если не получается по именам
+        common = sorted(set(low_files) & set(norm_files))
+        if not common:
+            # Fallback: матчим по порядку, если имена не совпадают
+            low_sorted  = sorted(low_files.values())
+            norm_sorted = sorted(norm_files.values())
+            pairs = list(zip(low_sorted, norm_sorted))
+        else:
+            pairs = [(low_files[n], norm_files[n]) for n in common]
+
+        subset_name = low_dir.parent.parent.name  # Real_captured or Synthetic
+        print(f"  LOL-v2 {subset_name}: {len(pairs)} пар", end="", flush=True)
+
+        lol_y = []
+        for low_path, norm_path in pairs:
+            try:
+                features = extract_features(low_path)
+
+                raw_lum, raw_contrast, raw_sat = _img_stats(low_path)
+                exp_lum, exp_contrast, exp_sat = _img_stats(norm_path)
+
+                brightness = float(np.clip((exp_lum      - raw_lum)      / 0.3,  -1.0, 1.0))
+                contrast   = float(np.clip((exp_contrast - raw_contrast) / 0.25, -1.0, 1.0))
+                saturation = float(np.clip((exp_sat      - raw_sat)      / 0.3,  -1.0, 1.0))
+
+                X.append(features)
+                y.append([brightness, contrast, saturation])
+                lol_y.append([brightness, contrast, saturation])
+            except Exception as e:
+                print(f"\n    Пропуск: {e}", end="")
+
+        ly = np.array(lol_y)
+        print(f" ✓  mean=[{ly.mean(axis=0)[0]:+.2f}, {ly.mean(axis=0)[1]:+.2f}, {ly.mean(axis=0)[2]:+.2f}]"
+              f"  (brightness, contrast, saturation)")
+
+    return X, y
+
+
 def build_dataset():
     if not RAW_DIR.exists():
         raise FileNotFoundError(f"Папка не найдена: {RAW_DIR}")
@@ -130,15 +190,13 @@ def build_dataset():
     if not available_experts:
         raise FileNotFoundError(
             f"Папки экспертов не найдены. Скопируйте из Kaggle датасета:\n"
-            f"  a/ → data/a/,  b/ → data/b/,  c/ → data/c/,  d/ → data/d/,  e/ → data/e/"
+            f"  c/ → data/c/"
         )
 
     raw_files = {p.stem: p for p in sorted(RAW_DIR.glob("*.jpg"))}
-    print(f"Исходников (raw): {len(raw_files)}")
+    print(f"Исходников FiveK (raw): {len(raw_files)}")
 
-    # ── Кэш признаков и статистик raw-изображений ─────────────────────────────
-    # raw читается один раз — не 5 раз для каждого эксперта
-    print("Кэширование признаков raw-изображений...")
+    print("Кэширование признаков FiveK raw-изображений...")
     raw_features_cache = {}
     raw_stats_cache    = {}
     for i, (name, path) in enumerate(raw_files.items()):
@@ -155,6 +213,7 @@ def build_dataset():
     X, y = [], []
     total_pairs = 0
 
+    print("FiveK Expert C:")
     for expert_dir in available_experts:
         expert_files = {p.stem: p for p in sorted(expert_dir.glob("*.jpg"))}
         common       = sorted(set(raw_features_cache) & set(expert_files))
@@ -164,12 +223,10 @@ def build_dataset():
         expert_y = []
         for name in common:
             try:
-                # Признаки берём из кэша — не читаем raw повторно
                 features = raw_features_cache[name]
 
-                # Статистики expert считаем один раз
-                raw_lum, raw_contrast, raw_sat       = raw_stats_cache[name]
-                exp_lum, exp_contrast, exp_sat       = _img_stats(expert_files[name])
+                raw_lum, raw_contrast, raw_sat = raw_stats_cache[name]
+                exp_lum, exp_contrast, exp_sat = _img_stats(expert_files[name])
 
                 brightness = float(np.clip((exp_lum      - raw_lum)      / 0.3,  -1.0, 1.0))
                 contrast   = float(np.clip((exp_contrast - raw_contrast) / 0.25, -1.0, 1.0))
@@ -185,10 +242,21 @@ def build_dataset():
         print(f" ✓  mean=[{ey.mean(axis=0)[0]:+.2f}, {ey.mean(axis=0)[1]:+.2f}, {ey.mean(axis=0)[2]:+.2f}]"
               f"  (brightness, contrast, saturation)")
 
+    print("\nLOL-v2:")
+    lol_X, lol_y = load_lol_pairs()
+    if lol_X:
+        X.extend(lol_X)
+        y.extend(lol_y)
+        total_pairs += len(lol_X)
+        print(f"  LOL-v2 добавлено: {len(lol_X)} пар")
+    else:
+        print("  LOL-v2 не найден — пропускаем")
+        print("  Ожидаемый путь: data/lol-v2/Real_captured/Train/Low/")
+
     X = np.array(X, dtype=np.float32)
     y = np.array(y, dtype=np.float32)
 
-    print(f"\nВсего пар: {len(X)} (из {total_pairs})")
+    print(f"\nВсего пар: {len(X)}")
     print(f"Метки — mean: {y.mean(axis=0).round(3)}, std: {y.std(axis=0).round(3)}")
     if y.std(axis=0).max() < 0.05:
         print("⚠️  Маленькая дисперсия меток — проверьте пары изображений")

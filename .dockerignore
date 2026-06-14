@@ -1,0 +1,16 @@
+#Python
+train/
+**/__pycache__/
+**/*.pyc
+**/.venv/
+
+#Git
+.git/
+.gitignore
+
+train/data/
+train/model/
+
+*.tar
+*.zip
+*DS_Store
